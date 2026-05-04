@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -sS https://bootstrap.pypa.io/get-pip.py)",
+      "Bash(.venv/bin/python3)",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(.venv/bin/python3 -c \"import stim, pymatching, numpy, matplotlib; print\\('stim', stim.__version__\\); print\\('pymatching', pymatching.__version__\\)\")",
+      "Bash(.venv/bin/python3 -)",
+      "Bash(.venv/bin/python3 -m ipykernel install --user --name surface-code-venv --display-name \"Surface Code \\(.venv\\)\")",
+      "Bash(.venv/bin/python3 -c ' *)",
+      "Bash(jupyter kernelspec *)",
+      "Bash(.venv/bin/jupyter kernelspec *)"
+    ]
+  }
+}
