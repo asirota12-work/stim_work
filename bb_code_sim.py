@@ -86,6 +86,63 @@ class BPOSDDecoder(Decoder):
         return predictions
 
 
+class RelayBPDecoder(Decoder):
+    """
+    Relay belief-propagation decoder via relay_bp (Rust).
+
+    Chains multiple DMem-BP runs initialized with the previous run's final
+    marginals, breaking symmetry traps that stall standard BP. Supports true
+    batched decoding (parallelised in Rust), making it much faster than the
+    shot-by-shot BPOSDDecoder loop for BB codes.
+    """
+
+    def __init__(
+        self,
+        gamma0: float = 0.1,
+        pre_iter: int = 80,
+        num_sets: int = 100,
+        set_max_iter: int = 60,
+        gamma_dist_interval: tuple = (-0.24, 0.66),
+        stop_nconv: int = 5,
+        parallel: bool = True,
+    ) -> None:
+        self._gamma0 = gamma0
+        self._pre_iter = pre_iter
+        self._num_sets = num_sets
+        self._set_max_iter = set_max_iter
+        self._gamma_dist_interval = gamma_dist_interval
+        self._stop_nconv = stop_nconv
+        self._parallel = parallel
+        self._observable_decoder = None
+
+    def setup(self, circuit: stim.Circuit) -> None:
+        import relay_bp
+        from relay_bp.stim import CheckMatrices
+
+        dem = circuit.detector_error_model(flatten_loops=True)
+        cm = CheckMatrices.from_dem(dem)
+        relay_decoder = relay_bp.RelayDecoderF64(
+            cm.check_matrix,
+            error_priors=cm.error_priors,
+            gamma0=self._gamma0,
+            pre_iter=self._pre_iter,
+            num_sets=self._num_sets,
+            set_max_iter=self._set_max_iter,
+            gamma_dist_interval=self._gamma_dist_interval,
+            stop_nconv=self._stop_nconv,
+        )
+        self._observable_decoder = relay_bp.ObservableDecoderRunner(
+            relay_decoder, cm.observables_matrix
+        )
+
+    def decode_batch(self, detection_events: np.ndarray) -> np.ndarray:
+        if self._observable_decoder is None:
+            raise RuntimeError("Call setup(circuit) before decode_batch.")
+        return self._observable_decoder.decode_observables_batch(
+            detection_events.astype(np.uint8), parallel=self._parallel, progress_bar=False
+        )
+
+
 class BBPyMatchingDecoder(Decoder):
     """
     MWPM decoder for BB codes. Passes ignore_decomposition_failures=True
@@ -526,7 +583,7 @@ class BBCodeSimulator:
     ) -> SimulationResult:
         circuit = self.build_circuit(error_model, rounds)
         if decoder is None:
-            decoder = BPOSDDecoder()
+            decoder = RelayBPDecoder()
         decoder.setup(circuit)
 
         sampler = circuit.compile_detector_sampler(seed=seed)
@@ -589,7 +646,7 @@ def bb_threshold_sweep(
     rounds_per_code: Optional[Dict[int, int]] = None,
     shots: int = 10_000,
     p_meas_factor: float = 1.0,
-    decoder_cls=PyMatchingDecoder,
+    decoder_cls=RelayBPDecoder,
     seed: Optional[int] = None,
 ) -> Dict[int, List[SimulationResult]]:
     """

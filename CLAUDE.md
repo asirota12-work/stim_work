@@ -4,12 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Setup
 
+`relay_bp` requires Rust to build. Install Rust first, then install all packages:
+
 ```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+source $HOME/.cargo/env
 pip install -r requirements.txt
-pip install ldpc  # required for BB code BP-OSD decoder
 ```
 
-Key packages: `stim` (quantum circuit simulation), `pymatching` (MWPM decoder), `ldpc` (BP-OSD decoder for BB codes).
+Key packages: `stim` (quantum circuit simulation), `pymatching` (MWPM decoder), `ldpc` (BP-OSD decoder, fallback for BB codes), `relay_bp` (Rust-native relay-BP decoder, default for BB codes).
 
 ## Running simulations
 
